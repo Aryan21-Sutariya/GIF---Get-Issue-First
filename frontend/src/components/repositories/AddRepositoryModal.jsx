@@ -1,51 +1,50 @@
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import Badge from '../ui/Badge';
-import { Info, Plus, X } from 'lucide-react';
-
-const PRESET_LABELS = [
-  'good first issue', 'help wanted', 'bug', 
-  'documentation', 'enhancement', 'easy', 
-  'beginner', 'bounty'
-];
-
-const parseRepoName = (url) => {
-  try {
-    const parsed = new URL(url);
-    const pathParts = parsed.pathname.split('/').filter(Boolean);
-    if (pathParts.length >= 2) {
-      return `${pathParts[0]}/${pathParts[1]}`;
-    }
-    return 'unknown/repository';
-  } catch (e) {
-    const parts = url.split('/').filter(Boolean);
-    if (parts.length >= 2) {
-      return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
-    }
-    return 'unknown/repository';
-  }
-};
+import { Info, Plus } from 'lucide-react';
+import { api } from '../../services/api';
 
 const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
   const [step, setStep] = useState(1);
   const [url, setUrl] = useState('');
   const [selectedLabels, setSelectedLabels] = useState([]);
   const [customLabel, setCustomLabel] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [repoData, setRepoData] = useState(null);
+  const [availableLabels, setAvailableLabels] = useState([]);
   
-  // reset on open/close
   React.useEffect(() => {
     if (isOpen) {
       setStep(1);
       setUrl('');
-      setSelectedLabels(['good first issue', 'help wanted']);
+      setSelectedLabels([]);
       setCustomLabel('');
+      setError(null);
+      setRepoData(null);
+      setAvailableLabels([]);
     }
   }, [isOpen]);
 
-  const handleNext = () => {
-    if (url.trim().length > 0) {
+  const handleNext = async () => {
+    if (isPrivate) {
+      if (url.trim().length > 0) setStep(2);
+      return; 
+    }
+    
+    if (url.trim().length === 0) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.lookupPublicRepository(url);
+      setRepoData(data);
+      setAvailableLabels(data.labels.length > 0 ? data.labels : ['good first issue', 'help wanted']);
       setStep(2);
+    } catch (err) {
+      setError(err.message || 'Failed to lookup repository.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,23 +64,25 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
     }
   };
 
-  const handleStartWatching = () => {
-    const name = parseRepoName(url);
-    const newRepo = {
-      id: `${name}-${Date.now()}`,
-      name: name,
-      description: `Automatically added ${isPrivate ? 'private' : 'public'} repository watching for specific labels.`,
-      language: 'Unknown',
-      watchedIssues: 0,
-      newIssues: 0,
-      labels: selectedLabels,
-      isPrivate,
-    };
-    onAdd(newRepo);
-    
-    // Simulate toast
-    alert(`Repository added to your watchlist.`);
-    onClose();
+  const handleStartWatching = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (isPrivate) {
+         onAdd({ id: Date.now().toString(), name: 'private/fallback', description: 'Mock', language: 'Unknown', watchedIssues: 0, newIssues: 0, labels: selectedLabels, isPrivate: true });
+         alert(`Repository added to your watchlist.`);
+         onClose();
+         return;
+      }
+      
+      await onAdd(url, selectedLabels);
+      alert(`Repository added to your watchlist.`);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to save repository.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,13 +109,15 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleNext(); }}
+              disabled={loading}
             />
+            {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
           </div>
           
           <div className="mt-8 pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
-            <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" onClick={handleNext} disabled={!url.trim()}>
-              Continue
+            <Button variant="ghost" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button variant="primary" onClick={handleNext} disabled={!url.trim() || loading}>
+              {loading ? 'Verifying...' : 'Continue'}
             </Button>
           </div>
         </div>
@@ -133,7 +136,12 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
           )}
 
           <div className="text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg py-3 px-4 mb-4 border border-slate-100 dark:border-slate-800">
-             <h4 className="font-medium text-purple-600 dark:text-purple-400 break-words">{parseRepoName(url)}</h4>
+             <h4 className="font-medium text-purple-600 dark:text-purple-400 break-words">
+                {repoData ? repoData.fullName : 'unknown/repository'}
+             </h4>
+             {repoData && repoData.description && (
+               <p className="text-xs text-slate-500 mt-1">{repoData.description}</p>
+             )}
           </div>
 
           <div>
@@ -142,7 +150,7 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
             </h4>
             
             <div className="flex flex-wrap gap-2 mb-4">
-              {PRESET_LABELS.map(label => {
+              {availableLabels.map(label => {
                 const isSelected = selectedLabels.includes(label);
                 return (
                   <button
@@ -178,12 +186,13 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
                 Add
               </Button>
             </form>
+            {error && <p className="text-red-500 text-xs mt-3">{error}</p>}
           </div>
 
           <div className="mt-8 pt-4 flex justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
-            <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
-            <Button variant="primary" onClick={handleStartWatching}>
-              Start Watching
+            <Button variant="ghost" onClick={() => setStep(1)} disabled={loading}>Back</Button>
+            <Button variant="primary" onClick={handleStartWatching} disabled={loading || selectedLabels.length === 0}>
+              {loading ? 'Saving...' : 'Start Watching'}
             </Button>
           </div>
         </div>

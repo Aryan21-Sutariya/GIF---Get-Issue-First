@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, MessageSquare, ExternalLink, Star } from 'lucide-react';
 import TopBar from '../components/layout/TopBar';
@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import GithubIcon from '../components/ui/GithubIcon';
 import { useRepositories } from '../context/RepositoryContext';
-import { publicIssues } from '../data/mockIssues';
+import { api } from '../services/api';
 
 const PRESET_LABELS = [
   'bug', 'documentation', 'enhancement', 'beginner', 
@@ -19,21 +19,54 @@ const PublicRepositoryDetail = () => {
   const [activeTab, setActiveTab] = useState('issues');
   const { publicRepos, updatePublicRepoLabels } = useRepositories();
   const [customLabel, setCustomLabel] = useState('');
+  
+  const [issues, setIssues] = useState([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+  const [issuesError, setIssuesError] = useState(null);
+  
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   const repository = publicRepos.find(r => r.name === repoName) || {
     name: repoName,
-    description: 'A mock repository added via the Add Repository flow.',
-    language: 'JavaScript',
-    stars: '1.2k',
-    labels: ['bug', 'help wanted']
+    description: 'A repository not found natively in contexts.',
+    language: 'Unknown',
+    stars: '~',
+    labels: []
   };
 
   const [localLabels, setLocalLabels] = useState(repository.labels || []);
 
-  const allMockIssues = publicIssues[repoName] || [];
-  const issues = allMockIssues.filter(issue => 
-    issue.labels.some(l => (repository.labels || []).includes(l))
-  );
+  useEffect(() => {
+    if (repository.labels) {
+      setLocalLabels(repository.labels);
+    }
+  }, [repository.labels]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (activeTab === 'issues' && repository && repository.id) {
+       if (repository.labels.length === 0) {
+         if (isMounted) {
+           setIssues([]);
+           setIssuesError(null);
+         }
+         return;
+       }
+       setLoadingIssues(true);
+       setIssuesError(null);
+       api.fetchGithubIssuesAction(repository.id)
+         .then(data => {
+           if (isMounted) setIssues(data.issues || []);
+         })
+         .catch(err => {
+           if (isMounted) setIssuesError(err.message);
+         })
+         .finally(() => {
+           if (isMounted) setLoadingIssues(false);
+         });
+    }
+    return () => { isMounted = false; };
+  }, [activeTab, repository.id, repository.labels]); // re-fetch if labels change (simulated properly).
 
   const handleRemoveLabel = (labelToRemove) => {
     setLocalLabels(prev => prev.filter(l => l !== labelToRemove));
@@ -51,9 +84,26 @@ const PublicRepositoryDetail = () => {
     setCustomLabel('');
   };
 
-  const handleSaveChanges = () => {
-    updatePublicRepoLabels(repoName, localLabels);
-    alert('Settings saved successfully!');
+  const handleSaveChanges = async () => {
+    if (!repository || !repository.id) return;
+    setIsSavingSettings(true);
+    try {
+      await api.updatePublicRepositoryLabels(repository.id, localLabels);
+      updatePublicRepoLabels(repoName, localLabels);
+      alert('Settings successfully updated and persisted to Database!');
+    } catch (err) {
+      alert('Failed to save settings: ' + err.message);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const formatDisplayDate = (isoString) => {
+    try {
+      return new Date(isoString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return isoString;
+    }
   };
 
   return (
@@ -86,12 +136,12 @@ const PublicRepositoryDetail = () => {
                 </p>
                 <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                     <span className="w-3 h-3 rounded-full bg-blue-500"></span>
                     {repository.language}
                   </div>
                   <div className="flex items-center gap-1">
                     <Star className="h-4 w-4" />
-                    {repository.stars || '123'}
+                    {repository.stars}
                   </div>
                 </div>
               </div>
@@ -147,7 +197,15 @@ const PublicRepositoryDetail = () => {
             </div>
             
             <div className="space-y-4">
-              {issues.length > 0 ? (
+              {loadingIssues ? (
+                <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
+                  <p className="text-slate-500 dark:text-slate-400">Loading matching issues...</p>
+                </div>
+              ) : issuesError ? (
+                <div className="text-center py-12 px-4 border border-red-300 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 rounded-lg">
+                  <p className="text-red-500 dark:text-red-400 font-medium">Error: {issuesError}</p>
+                </div>
+              ) : issues.length > 0 ? (
                 issues.map((issue) => (
                   <div 
                     key={issue.id} 
@@ -167,7 +225,7 @@ const PublicRepositoryDetail = () => {
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs md:text-sm text-slate-500 dark:text-slate-400">
                           <span>#{issue.number}</span>
-                          <span>opened {issue.createdAt} by {issue.author}</span>
+                          <span>opened {formatDisplayDate(issue.createdAt)} by {issue.author}</span>
                           <span className="flex items-center gap-1">
                             <MessageSquare className="h-4 w-4" />
                             {issue.commentCount}
@@ -188,9 +246,19 @@ const PublicRepositoryDetail = () => {
                     </div>
                   </div>
                 ))
+              ) : repository.labels.length === 0 ? (
+                <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                   <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">No labels selected</h3>
+                   <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md mx-auto">
+                    Please select at least one label in Repository Settings to start watching matching issues.
+                  </p>
+                  <Button variant="primary" onClick={() => setActiveTab('settings')}>
+                    Go to Settings
+                  </Button>
+                </div>
               ) : (
                 <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
-                  <p className="text-slate-500 dark:text-slate-400">
+                   <p className="text-slate-500 dark:text-slate-400">
                     No new matching issues found for <span className="font-medium text-slate-700 dark:text-slate-300">{repoName}</span>.
                   </p>
                 </div>
@@ -277,8 +345,8 @@ const PublicRepositoryDetail = () => {
             </div>
 
             <div className="pt-6 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-              <Button variant="primary" onClick={handleSaveChanges}>
-                Save Changes
+              <Button variant="primary" onClick={handleSaveChanges} disabled={isSavingSettings}>
+                {isSavingSettings ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </div>

@@ -5,6 +5,8 @@ const cookieParser = require('cookie-parser');
 const healthRoutes = require('./routes/healthRoutes');
 const dbHealthRoutes = require('./routes/dbHealthRoutes');
 const authRoutes = require('./routes/authRoutes');
+const repositoryRoutes = require('./routes/repositoryRoutes');
+const authMiddleware = require('./middleware/auth');
 
 const app = express();
 
@@ -16,5 +18,6 @@ app.use(cookieParser());
 app.use('/api', healthRoutes);
 app.use('/api', dbHealthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/repositories', authMiddleware, repositoryRoutes);
 
 module.exports = app;

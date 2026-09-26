@@ -6,13 +6,13 @@ import { AuthProvider } from './context/AuthContext';
 
 function App() {
   return (
-    <RepositoryProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <RepositoryProvider>
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
-      </AuthProvider>
-    </RepositoryProvider>
+      </RepositoryProvider>
+    </AuthProvider>
   );
 }
 

@@ -64,7 +64,7 @@ model RepositoryLabel {
 model Issue {
   id              String         @id @default(uuid())
   repositoryId    String
-  githubIssueId   Int
+  githubIssueId   BigInt
   issueNumber     Int
   title           String
   url             String

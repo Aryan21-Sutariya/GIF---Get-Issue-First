@@ -17,7 +17,7 @@ const RepositoryCard = ({ repo }) => {
             <BookMarked className="mt-1 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
           )}
           <h3 className="break-words text-lg font-semibold text-purple-600 hover:underline dark:text-purple-400">
-            <a href="#">{repo.name}</a>
+            <span>{repo.name}</span>
           </h3>
           {repo.isPrivate && (
             <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">

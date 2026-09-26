@@ -23,5 +23,52 @@ export const api = {
   logout: async () => {
     const res = await fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
     return res.json();
+  },
+  lookupPublicRepository: async (url) => {
+    const res = await fetch(`${API_URL}/api/repositories/public/lookup?url=${encodeURIComponent(url)}`, { credentials: 'include' });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to lookup repository');
+    }
+    return res.json();
+  },
+  addPublicRepository: async (url, selectedLabels) => {
+    const res = await fetch(`${API_URL}/api/repositories/public`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ url, selectedLabels })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add repository');
+    }
+    return res.json();
+  },
+  getPublicRepositories: async () => {
+    const res = await fetch(`${API_URL}/api/repositories/public`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch public repositories');
+    return res.json();
+  },
+  updatePublicRepositoryLabels: async (repositoryId, labels) => {
+    const res = await fetch(`${API_URL}/api/repositories/public/${repositoryId}/labels`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ labels })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update labels');
+    }
+    return res.json();
+  },
+  fetchGithubIssuesAction: async (repositoryId) => {
+    const res = await fetch(`${API_URL}/api/repositories/public/${repositoryId}/issues`, { credentials: 'include' });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to fetch issues');
+    }
+    return res.json();
   }
 };
