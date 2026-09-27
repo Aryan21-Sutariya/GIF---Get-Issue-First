@@ -7,20 +7,37 @@ const Notifications = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    let isMounted = true;
+    let isPolling = false;
 
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getNotifications();
-      setNotifications(data.notifications || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchNotifications = async (silent = false) => {
+      if (silent && isPolling) return;
+      try {
+        if (!silent) setLoading(true);
+        if (silent) isPolling = true;
+        
+        const data = await api.getNotifications();
+        if (isMounted) {
+          setNotifications(data.notifications || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) {
+          if (!silent) setLoading(false);
+          isPolling = false;
+        }
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(() => fetchNotifications(true), 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleMarkAsRead = async (id) => {
     try {

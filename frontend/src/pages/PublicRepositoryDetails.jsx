@@ -44,6 +44,9 @@ const PublicRepositoryDetail = () => {
 
   useEffect(() => {
     let isMounted = true;
+    let isPolling = false;
+    let interval;
+
     if (activeTab === 'issues' && repository && repository.id) {
        if (repository.labels.length === 0) {
          if (isMounted) {
@@ -52,20 +55,38 @@ const PublicRepositoryDetail = () => {
          }
          return;
        }
-       setLoadingIssues(true);
-       setIssuesError(null);
-       api.fetchGithubIssuesAction(repository.id)
-         .then(data => {
+
+       const fetchIssues = async (silent = false) => {
+         if (silent && isPolling) return;
+         if (!silent) {
+           setLoadingIssues(true);
+           setIssuesError(null);
+         } else {
+           isPolling = true;
+         }
+         try {
+           const data = await api.fetchGithubIssuesAction(repository.id);
            if (isMounted) setIssues(data.issues || []);
-         })
-         .catch(err => {
-           if (isMounted) setIssuesError(err.message);
-         })
-         .finally(() => {
-           if (isMounted) setLoadingIssues(false);
-         });
+         } catch (err) {
+           if (isMounted && !silent) setIssuesError(err.message);
+         } finally {
+           if (isMounted) {
+             if (!silent) setLoadingIssues(false);
+             isPolling = false;
+           }
+         }
+       };
+
+       fetchIssues();
+       interval = setInterval(() => {
+         fetchIssues(true);
+       }, 10000);
     }
-    return () => { isMounted = false; };
+    
+    return () => { 
+      isMounted = false; 
+      if (interval) clearInterval(interval);
+    };
   }, [activeTab, repository.id, repository.labels]); // re-fetch if labels change (simulated properly).
 
   const handleRemoveLabel = (labelToRemove) => {
