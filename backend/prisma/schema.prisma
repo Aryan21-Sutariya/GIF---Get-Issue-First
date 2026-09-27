@@ -99,4 +99,6 @@ model Notification {
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   issue        Issue      @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repositoryId, issueId])
 }

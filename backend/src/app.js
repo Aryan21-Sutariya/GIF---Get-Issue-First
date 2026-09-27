@@ -7,11 +7,12 @@ const dbHealthRoutes = require('./routes/dbHealthRoutes');
 const authRoutes = require('./routes/authRoutes');
 const repositoryRoutes = require('./routes/repositoryRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const authMiddleware = require('./middleware/auth');
 
 const app = express();
 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json({
   verify: (req, res, buf) => {
     if (buf && buf.length) {
@@ -27,5 +28,6 @@ app.use('/api', dbHealthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/repositories', authMiddleware, repositoryRoutes);
+app.use('/api/notifications', authMiddleware, notificationRoutes);
 
 module.exports = app;

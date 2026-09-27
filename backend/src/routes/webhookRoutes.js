@@ -32,9 +32,20 @@ router.post('/github', async (req, res) => {
     
     if (event === 'issues') {
       const payload = req.body;
+      if (!payload || !payload.issue || !payload.repository || !payload.action) {
+        console.log(`[Webhook] Malformed payload, missing issue/repository/action`);
+        return res.status(400).json({ error: 'Malformed payload' });
+      }
+
       if (payload.action === 'opened') {
         const issue = payload.issue;
         const repository = payload.repository;
+        
+        if (issue.pull_request) {
+          console.log(`[Webhook] Pull request event handled securely as ignore`);
+          return res.json({ received: true });
+        }
+        
         console.log(`[Webhook] GitHub webhook received -> signature verified -> event type: ${event} -> action: ${payload.action}`);
         
         const gifRepos = await prisma.repository.findMany({
@@ -47,7 +58,8 @@ router.post('/github', async (req, res) => {
           return res.json({ received: true });
         }
 
-        const issueLabels = (issue.labels || []).map(l => l.name);
+        const rawIssueLabels = (issue.labels || []).map(l => l.name);
+        const issueLabels = [...new Set(rawIssueLabels)];
 
         for (const gifRepo of gifRepos) {
           if (!gifRepo.monitoringEnabled) {
@@ -98,6 +110,29 @@ router.post('/github', async (req, res) => {
             await prisma.issueLabel.createMany({
               data: issueLabels.map(labelName => ({ issueId: upsertedIssue.id, labelName }))
             });
+          }
+
+          // Create Notification for exact user (enforcing idempotency via Schema constraint mapping exception or upsert strategy/findFirst)
+          try {
+            await prisma.notification.upsert({
+              where: {
+                userId_repositoryId_issueId: {
+                  userId: gifRepo.userId,
+                  repositoryId: gifRepo.id,
+                  issueId: upsertedIssue.id
+                }
+              },
+              update: {}, // Do nothing if it already exists
+              create: {
+                userId: gifRepo.userId,
+                repositoryId: gifRepo.id,
+                issueId: upsertedIssue.id,
+                type: "NEW_MATCHING_ISSUE"
+              }
+            });
+          } catch (notifErr) {
+            console.error(`[Webhook] Error creating notification for user ${gifRepo.userId}:`, notifErr);
+            // Allow processing to continue even if notification fails (or is ignored due to concurrency)
           }
         }
       }

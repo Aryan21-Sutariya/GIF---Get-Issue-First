@@ -6,13 +6,14 @@ const crypto = require('crypto');
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-const GITHUB_CALLBACK_URL = process.env.GITHUB_CALLBACK_URL || 'http://localhost:5000/api/auth/github/callback';
+const GITHUB_CALLBACK_URL = process.env.GITHUB_CALLBACK_URL;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-session-secret';
 
 router.get('/github', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
-  res.cookie('oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 10 * 60 * 1000 });
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${GITHUB_CALLBACK_URL}&state=${state}&scope=read:user`;
+  res.cookie('oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', maxAge: 10 * 60 * 1000 });
+  const encodedCallback = GITHUB_CALLBACK_URL ? encodeURIComponent(GITHUB_CALLBACK_URL) : '';
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodedCallback}&state=${state}&scope=read:user`;
   res.redirect(githubAuthUrl);
 });
 
@@ -90,11 +91,11 @@ router.get('/github/callback', async (req, res) => {
     res.cookie('gif_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
-    res.redirect('http://localhost:5173/account');
+    res.redirect(`${process.env.FRONTEND_URL}/account`);
   } catch (err) {
     console.error('OAuth Error:', err);
     res.status(500).send('Internal Server Error during GitHub OAuth.');
