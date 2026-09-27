@@ -31,7 +31,7 @@ const Notifications = () => {
     };
 
     fetchNotifications();
-    const interval = setInterval(() => fetchNotifications(true), 10000);
+    const interval = setInterval(() => fetchNotifications(true), 5000);
 
     return () => {
       isMounted = false;

@@ -80,7 +80,7 @@ const PublicRepositoryDetail = () => {
        fetchIssues();
        interval = setInterval(() => {
          fetchIssues(true);
-       }, 10000);
+       }, 5000);
     }
     
     return () => { 
