@@ -1,9 +1,22 @@
-// Placeholder for future backend API communication
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Production-ready API communication relies strictly on ENV definitions
+export const API_URL = import.meta.env.VITE_API_URL;
 
 export const api = {
   getRepositories: async () => [],
   getIssues: async () => [],
+  getNotifications: async () => {
+    const response = await fetch(`${API_URL}/api/notifications`, { credentials: 'include' });
+    if (!response.ok) throw new Error('Failed to fetch notifications');
+    return response.json();
+  },
+  markNotificationAsRead: async (id) => {
+    const response = await fetch(`${API_URL}/api/notifications/${id}/read`, {
+      method: 'PATCH',
+      credentials: 'include'
+    });
+    if (!response.ok) throw new Error('Failed to mark notification as read');
+    return response.json();
+  },
   checkBackendHealth: async () => {
     try {
       const response = await fetch(`${API_URL}/api/health`, { credentials: 'omit' });

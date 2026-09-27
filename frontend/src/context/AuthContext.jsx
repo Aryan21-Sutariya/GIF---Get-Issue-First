@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, API_URL as api_url } from '../services/api';
 
 export const AuthContext = createContext();
 
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = () => {
-    window.location.href = 'http://localhost:5000/api/auth/github';
+    window.location.href = `${api_url}/api/auth/github`;
   };
 
   const logout = async () => {
