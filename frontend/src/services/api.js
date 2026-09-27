@@ -70,5 +70,57 @@ export const api = {
       throw new Error(err.error || 'Failed to fetch issues');
     }
     return res.json();
+  },
+  
+  // ======================
+  // PRIVATE ENDPOINTS
+  // ======================
+  
+  lookupPrivateRepository: async (url) => {
+    const res = await fetch(`${API_URL}/api/repositories/private/lookup?url=${encodeURIComponent(url)}`, { credentials: 'include' });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to lookup repository');
+    }
+    return res.json();
+  },
+  addPrivateRepository: async (url, selectedLabels) => {
+    const res = await fetch(`${API_URL}/api/repositories/private`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ url, selectedLabels })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add repository');
+    }
+    return res.json();
+  },
+  getPrivateRepositories: async () => {
+    const res = await fetch(`${API_URL}/api/repositories/private`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch private repositories');
+    return res.json();
+  },
+  updatePrivateRepositoryLabels: async (repositoryId, labels) => {
+    const res = await fetch(`${API_URL}/api/repositories/private/${repositoryId}/labels`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ labels })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update labels');
+    }
+    return res.json();
+  },
+  fetchPrivateGithubIssuesAction: async (repositoryId) => {
+    const res = await fetch(`${API_URL}/api/repositories/private/${repositoryId}/issues`, { credentials: 'include' });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to fetch issues');
+    }
+    return res.json();
   }
 };

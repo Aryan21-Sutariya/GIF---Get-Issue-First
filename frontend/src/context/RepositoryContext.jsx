@@ -10,7 +10,7 @@ export const useRepositories = () => useContext(RepositoryContext);
 export const RepositoryProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
   const [publicRepos, setPublicRepos] = useState([]);
-  const [privateRepos, setPrivateRepos] = useState(initialPrivateRepos);
+  const [privateRepos, setPrivateRepos] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -18,8 +18,15 @@ export const RepositoryProvider = ({ children }) => {
       api.getPublicRepositories().then(data => {
         if (isMounted) setPublicRepos(data);
       }).catch(console.error);
+
+      api.getPrivateRepositories().then(data => {
+        if (isMounted) setPrivateRepos(data);
+      }).catch(console.error);
     } else {
-      if (isMounted) setPublicRepos([]);
+      if (isMounted) {
+        setPublicRepos([]);
+        setPrivateRepos([]);
+      }
     }
     return () => { isMounted = false; };
   }, [user]);
@@ -30,8 +37,10 @@ export const RepositoryProvider = ({ children }) => {
     setPublicRepos(updated);
   };
 
-  const addPrivateRepo = (repo) => {
-    setPrivateRepos([repo, ...privateRepos]);
+  const addPrivateRepo = async (url, selectedLabels) => {
+    await api.addPrivateRepository(url, selectedLabels);
+    const updated = await api.getPrivateRepositories();
+    setPrivateRepos(updated);
   };
 
   const updatePublicRepoLabels = (name, labels) => {

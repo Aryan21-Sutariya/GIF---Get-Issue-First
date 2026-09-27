@@ -27,19 +27,20 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
   }, [isOpen]);
 
   const handleNext = async () => {
-    if (isPrivate) {
-      if (url.trim().length > 0) setStep(2);
-      return; 
-    }
-    
     if (url.trim().length === 0) return;
     
     setLoading(true);
     setError(null);
     try {
-      const data = await api.lookupPublicRepository(url);
-      setRepoData(data);
-      setAvailableLabels(data.labels.length > 0 ? data.labels : ['good first issue', 'help wanted']);
+      if (isPrivate) {
+        const data = await api.lookupPrivateRepository(url);
+        setRepoData(data);
+        setAvailableLabels(data.labels.length > 0 ? data.labels : ['good first issue', 'help wanted']);
+      } else {
+        const data = await api.lookupPublicRepository(url);
+        setRepoData(data);
+        setAvailableLabels(data.labels.length > 0 ? data.labels : ['good first issue', 'help wanted']);
+      }
       setStep(2);
     } catch (err) {
       setError(err.message || 'Failed to lookup repository.');
@@ -69,7 +70,7 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
     setError(null);
     try {
       if (isPrivate) {
-         onAdd({ id: Date.now().toString(), name: 'private/fallback', description: 'Mock', language: 'Unknown', watchedIssues: 0, newIssues: 0, labels: selectedLabels, isPrivate: true });
+         await onAdd(url, selectedLabels);
          alert(`Repository added to your watchlist.`);
          onClose();
          return;
@@ -129,8 +130,7 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
             <div className="flex gap-3 rounded-md bg-amber-50 dark:bg-amber-500/10 p-4 border border-amber-200 dark:border-amber-900/50">
               <Info className="h-5 w-5 text-amber-600 dark:text-amber-500 shrink-0" />
               <p className="text-sm text-amber-800 dark:text-amber-400">
-                <strong>Authorization Required:</strong> Private repository access will require GitHub authorization.
-                This is a UI placeholder and no actual OAuth will occur.
+                <strong>Authorization Required:</strong> Note that private repository access requests will strictly validate your GitHub OAuth scopes. Ensure GIF has authorized access to this repository.
               </p>
             </div>
           )}
