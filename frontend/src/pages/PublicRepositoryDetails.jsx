@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, MessageSquare, ExternalLink, Star } from 'lucide-react';
 import TopBar from '../components/layout/TopBar';
 import Button from '../components/ui/Button';
@@ -16,6 +16,7 @@ const PRESET_LABELS = [
 const PublicRepositoryDetail = () => {
   const { owner, repo } = useParams();
   const repoName = `${owner}/${repo}`;
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('issues');
   const { publicRepos, updatePublicRepoLabels } = useRepositories();
   const [customLabel, setCustomLabel] = useState('');
@@ -88,6 +89,26 @@ const PublicRepositoryDetail = () => {
       if (interval) clearInterval(interval);
     };
   }, [activeTab, repository.id, repository.labels]); // re-fetch if labels change (simulated properly).
+
+  useEffect(() => {
+    if (activeTab === 'issues' && issues.length > 0) {
+      const searchParams = new URLSearchParams(location.search);
+      const issueParam = searchParams.get('issue');
+      if (issueParam) {
+        // Allow a tiny delay for rendering
+        setTimeout(() => {
+          const element = document.getElementById(`issue-${issueParam}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('ring-2', 'ring-purple-500', 'ring-offset-2', 'dark:ring-offset-slate-950', 'transition-all', 'duration-500');
+            setTimeout(() => {
+              element.classList.remove('ring-2', 'ring-purple-500', 'ring-offset-2', 'dark:ring-offset-slate-950');
+            }, 3000);
+          }
+        }, 100);
+      }
+    }
+  }, [issues, activeTab, location.search]);
 
   const handleRemoveLabel = (labelToRemove) => {
     setLocalLabels(prev => prev.filter(l => l !== labelToRemove));
@@ -230,7 +251,8 @@ const PublicRepositoryDetail = () => {
                 issues.map((issue) => (
                   <div 
                     key={issue.id} 
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 hover:border-purple-300 dark:hover:border-purple-500 transition-colors shadow-sm"
+                    id={`issue-${issue.number}`}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 hover:border-purple-300 dark:hover:border-purple-500 transition-colors shadow-sm scroll-mt-24"
                   >
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                       <div className="space-y-3 flex-1">

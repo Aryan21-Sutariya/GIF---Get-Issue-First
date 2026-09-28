@@ -21,7 +21,8 @@ router.get('/', async (req, res) => {
       isRead: n.isRead,
       createdAt: n.createdAt,
       repository: {
-        fullName: n.repository.fullName
+        fullName: n.repository.fullName,
+        isPrivate: n.repository.isPrivate
       },
       issue: {
         title: n.issue.title,
@@ -54,6 +55,23 @@ router.patch('/:id/read', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const notification = await prisma.notification.findUnique({ where: { id } });
+    if (!notification) return res.status(404).json({ error: 'Notification not found' });
+    if (notification.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized' });
+
+    await prisma.notification.delete({ where: { id } });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to dismiss notification' });
   }
 });
 

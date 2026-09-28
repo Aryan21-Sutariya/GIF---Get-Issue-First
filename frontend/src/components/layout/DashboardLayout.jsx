@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { api } from '../../services/api';
 
@@ -10,6 +10,10 @@ const DashboardLayout = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
+
+  const isInitialFetch = useRef(true);
+  const seenNotificationIds = useRef(new Set());
+  const navigate = useNavigate();
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -28,7 +32,37 @@ const DashboardLayout = () => {
         
         const data = await api.getNotifications();
         if (isMounted) {
-          setNotifications(data.notifications || []);
+          const incomingNotifications = data.notifications || [];
+          setNotifications(incomingNotifications);
+
+          if (isInitialFetch.current) {
+            incomingNotifications.forEach(n => seenNotificationIds.current.add(n.id));
+            isInitialFetch.current = false;
+          } else {
+            incomingNotifications.forEach(n => {
+              if (!seenNotificationIds.current.has(n.id)) {
+                seenNotificationIds.current.add(n.id);
+                
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  const title = "New issue found";
+                  const body = `${n.repository?.fullName || 'Unknown Repository'}\n#${n.issue?.number} ${n.issue?.title}`;
+                  const desktopNotification = new Notification(title, { body });
+
+                  desktopNotification.onclick = (e) => {
+                    e.preventDefault();
+                    window.focus();
+                    desktopNotification.close();
+                    if (n.repository?.fullName && n.issue?.number) {
+                      const type = n.repository.isPrivate ? 'private' : 'public';
+                      navigate(`/${type}/${n.repository.fullName}?issue=${n.issue.number}`);
+                    } else {
+                      navigate(`/notifications`);
+                    }
+                  };
+                }
+              }
+            });
+          }
         }
       } catch (err) {
         console.error(err);
@@ -47,7 +81,7 @@ const DashboardLayout = () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [navigate]);
 
   const handleMarkNotificationAsRead = async (id) => {
     try {
@@ -55,6 +89,27 @@ const DashboardLayout = () => {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (err) {
       console.error('Failed to mark as read', err);
+    }
+  };
+
+  const handleDismissNotification = async (id) => {
+    const index = notifications.findIndex(n => n.id === id);
+    if (index === -1) return;
+    const notificationToDismiss = notifications[index];
+    
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    
+    try {
+      await api.dismissNotification(id);
+    } catch (err) {
+      console.error('Failed to dismiss notification', err);
+      setNotifications(prev => {
+        const newNotifications = [...prev];
+        if (!newNotifications.some(n => n.id === id)) {
+          newNotifications.splice(index, 0, notificationToDismiss);
+        }
+        return newNotifications;
+      });
     }
   };
 
@@ -74,7 +129,8 @@ const DashboardLayout = () => {
       setIsMobileOpen,
       notifications,
       loadingNotifications,
-      handleMarkNotificationAsRead
+      handleMarkNotificationAsRead,
+      handleDismissNotification
     }}>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
         

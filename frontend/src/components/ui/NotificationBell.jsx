@@ -1,12 +1,26 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { LayoutContext } from '../layout/DashboardLayout';
 import { Link } from 'react-router-dom';
 
 const NotificationBell = () => {
-  const { notifications, handleMarkNotificationAsRead } = useContext(LayoutContext);
+  const { notifications, handleMarkNotificationAsRead, handleDismissNotification } = useContext(LayoutContext);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const [notificationPermission, setNotificationPermission] = useState(
+    'Notification' in window ? Notification.permission : 'unsupported'
+  );
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return;
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+    } catch (err) {
+      console.error('Failed to request notification permission', err);
+    }
+  };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -51,6 +65,24 @@ const NotificationBell = () => {
               <span className="text-xs text-slate-500 dark:text-slate-400">{unreadCount} unread</span>
             )}
           </div>
+          
+          {notificationPermission === 'default' && (
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-100 dark:border-indigo-800 flex justify-between items-center">
+              <span className="text-xs text-indigo-700 dark:text-indigo-300">Get desktop alerts</span>
+              <button 
+                onClick={requestNotificationPermission}
+                className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors"
+              >
+                Enable
+              </button>
+            </div>
+          )}
+          {notificationPermission === 'denied' && (
+            <div className="p-2 border-b border-slate-200 dark:border-slate-800 text-center">
+              <span className="text-[10px] text-slate-400">Desktop notifications blocked in browser settings</span>
+            </div>
+          )}
+
           <div className="max-h-96 overflow-y-auto">
             {recentNotifications.length === 0 ? (
               <div className="p-4 text-center text-sm text-slate-500 dark:text-slate-400">
@@ -64,22 +96,34 @@ const NotificationBell = () => {
                   className={`p-4 border-b border-slate-100/50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${n.isRead ? 'opacity-70' : 'bg-blue-50/50 dark:bg-slate-800/80'}`}
                 >
                   <div className="flex flex-col gap-1">
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {n.repository?.fullName || 'Unknown Repository'}
-                    </p>
+                    <div className="flex justify-between items-start">
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {n.repository?.fullName || 'Unknown Repository'}
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDismissNotification(n.id);
+                        }}
+                        className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors bg-transparent border-none p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 -mt-1 -mr-1"
+                        aria-label="Dismiss"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <p className={`text-sm break-words ${n.isRead ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white font-medium'}`}>
-                      {n.issue?.url ? (
-                        <a 
-                          href={n.issue.url} 
-                          target="_blank" 
-                          rel="noreferrer" 
+                      {n.repository?.fullName ? (
+                        <Link 
+                          to={`/${n.repository?.isPrivate ? 'private' : 'public'}/${n.repository?.fullName}?issue=${n.issue?.number}`}
                           className="hover:underline"
                           onClick={(e) => {
                             if (!n.isRead) handleMarkNotificationAsRead(n.id);
+                            setIsOpen(false);
                           }}
                         >
                           #{n.issue.number} {n.issue.title}
-                        </a>
+                        </Link>
                       ) : (
                         <span>#{n.issue?.number} {n.issue?.title}</span>
                       )}

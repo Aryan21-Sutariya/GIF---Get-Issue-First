@@ -17,6 +17,14 @@ export const api = {
     if (!response.ok) throw new Error('Failed to mark notification as read');
     return response.json();
   },
+  dismissNotification: async (id) => {
+    const response = await fetch(`${API_URL}/api/notifications/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    if (!response.ok) throw new Error('Failed to dismiss notification');
+    return response.json();
+  },
   checkBackendHealth: async () => {
     try {
       const response = await fetch(`${API_URL}/api/health`, { credentials: 'omit' });
