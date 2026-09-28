@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import ThemeToggle from '../ui/ThemeToggle';
 import Button from '../ui/Button';
 import NotificationBell from '../ui/NotificationBell';
+import ExtensionButton from '../ui/ExtensionButton';
 import { Plus, Menu } from 'lucide-react';
 import { LayoutContext } from './DashboardLayout';
 
@@ -32,6 +33,7 @@ const TopBar = ({ title, showTabs = true, onAddClick }) => {
           </Button>
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
           <NotificationBell />
+          <ExtensionButton />
           <ThemeToggle />
         </div>
       </div>
