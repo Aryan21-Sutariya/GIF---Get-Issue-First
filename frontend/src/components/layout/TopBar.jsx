@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import ThemeToggle from '../ui/ThemeToggle';
 import Button from '../ui/Button';
+import NotificationBell from '../ui/NotificationBell';
 import { Plus, Menu } from 'lucide-react';
 import { LayoutContext } from './DashboardLayout';
 
@@ -30,6 +31,7 @@ const TopBar = ({ title, showTabs = true, onAddClick }) => {
             <span className="inline sm:hidden">Add</span>
           </Button>
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
+          <NotificationBell />
           <ThemeToggle />
         </div>
       </div>

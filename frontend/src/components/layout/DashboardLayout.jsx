@@ -1,17 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import { api } from '../../services/api';
 
 export const LayoutContext = React.createContext();
 
 const DashboardLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     if (saved === 'true') setIsCollapsed(true);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let isPolling = false;
+
+    const fetchNotifications = async (silent = false) => {
+      if (silent && isPolling) return;
+      try {
+        if (!silent) setLoadingNotifications(true);
+        if (silent) isPolling = true;
+        
+        const data = await api.getNotifications();
+        if (isMounted) {
+          setNotifications(data.notifications || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) {
+          if (!silent) setLoadingNotifications(false);
+          isPolling = false;
+        }
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(() => fetchNotifications(true), 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleMarkNotificationAsRead = async (id) => {
+    try {
+      await api.markNotificationAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (err) {
+      console.error('Failed to mark as read', err);
+    }
+  };
 
   const toggleCollapse = () => {
     setIsCollapsed(prev => {
@@ -22,7 +67,15 @@ const DashboardLayout = () => {
   };
 
   return (
-    <LayoutContext.Provider value={{ isCollapsed, toggleCollapse, isMobileOpen, setIsMobileOpen }}>
+    <LayoutContext.Provider value={{
+      isCollapsed, 
+      toggleCollapse, 
+      isMobileOpen, 
+      setIsMobileOpen,
+      notifications,
+      loadingNotifications,
+      handleMarkNotificationAsRead
+    }}>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
         
         {/* Mobile Overlay Background */}

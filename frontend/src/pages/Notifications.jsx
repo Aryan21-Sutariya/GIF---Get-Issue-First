@@ -1,52 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext } from 'react';
 import TopBar from '../components/layout/TopBar';
-import { api } from '../services/api';
+import { LayoutContext } from '../components/layout/DashboardLayout';
 
 const Notifications = () => {
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    let isPolling = false;
-
-    const fetchNotifications = async (silent = false) => {
-      if (silent && isPolling) return;
-      try {
-        if (!silent) setLoading(true);
-        if (silent) isPolling = true;
-        
-        const data = await api.getNotifications();
-        if (isMounted) {
-          setNotifications(data.notifications || []);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (isMounted) {
-          if (!silent) setLoading(false);
-          isPolling = false;
-        }
-      }
-    };
-
-    fetchNotifications();
-    const interval = setInterval(() => fetchNotifications(true), 5000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const handleMarkAsRead = async (id) => {
-    try {
-      await api.markNotificationAsRead(id);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, isRead: true } : n));
-    } catch (err) {
-      console.error('Failed to mark as read');
-    }
-  };
+  const { notifications, loadingNotifications: loading, handleMarkNotificationAsRead: handleMarkAsRead } = useContext(LayoutContext);
 
   return (
     <div className="flex flex-col h-full">
