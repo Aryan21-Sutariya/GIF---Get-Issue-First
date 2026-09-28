@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "GIF Extensions",
+  "version": "1.0.0",
+  "description": "Notify you about your GIF GitHub issues instantly.",
+  "permissions": ["alarms", "storage"],
+  "host_permissions": [
+    "https://gif-backend-jemy.onrender.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

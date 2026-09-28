@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GIF Notifications</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GIF</div>
+    <div class="badge" id="unread-badge" style="display: none;">0 unread</div>
+  </div>
+
+  <div id="content" class="content">
+    <div id="loading" class="state-message">Loading notifications...</div>
+    <div id="logged-out" class="state-message hidden">
+      <p>Please log in to GIF.</p>
+      <button id="login-btn">Log In</button>
+    </div>
+    <div id="error" class="state-message hidden text-error"></div>
+    <div id="empty" class="state-message hidden">No new notifications.</div>
+    <div id="notifications-list" class="hidden"></div>
+  </div>
+
+  <div class="footer">
+    <button id="view-all-btn">View in GIF &rarr;</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
