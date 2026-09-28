@@ -11,21 +11,23 @@ export const RepositoryProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
   const [publicRepos, setPublicRepos] = useState([]);
   const [privateRepos, setPrivateRepos] = useState([]);
+  const [loadingRepos, setLoadingRepos] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
     if (user) {
-      api.getPublicRepositories().then(data => {
-        if (isMounted) setPublicRepos(data);
-      }).catch(console.error);
-
-      api.getPrivateRepositories().then(data => {
-        if (isMounted) setPrivateRepos(data);
-      }).catch(console.error);
+      setLoadingRepos(true);
+      Promise.all([
+        api.getPublicRepositories().then(data => { if (isMounted) setPublicRepos(data); }).catch(console.error),
+        api.getPrivateRepositories().then(data => { if (isMounted) setPrivateRepos(data); }).catch(console.error)
+      ]).finally(() => {
+        if (isMounted) setLoadingRepos(false);
+      });
     } else {
       if (isMounted) {
         setPublicRepos([]);
         setPrivateRepos([]);
+        setLoadingRepos(false);
       }
     }
     return () => { isMounted = false; };
@@ -55,6 +57,7 @@ export const RepositoryProvider = ({ children }) => {
     <RepositoryContext.Provider value={{
       publicRepos,
       privateRepos,
+      loadingRepos,
       addPublicRepo,
       addPrivateRepo,
       updatePublicRepoLabels,

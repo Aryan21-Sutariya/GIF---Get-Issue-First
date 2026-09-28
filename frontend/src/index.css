@@ -4,6 +4,17 @@
 
 @theme {
   --font-sans: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --color-slate-950: #0D0D0F;
+  --color-slate-900: #111114;
+  --color-slate-800: #16161A;
+  --color-slate-700: #29292F;
+  --color-slate-600: #4B5563;
+  --color-slate-500: #6B7280;
+  --color-slate-400: #9ca3af;
+  --color-slate-300: #d1d5db;
+  --color-slate-200: #e5e7eb;
+  --color-slate-100: #f3f4f6;
+  --color-slate-50: #f9fafb;
 }
 
 @layer base {

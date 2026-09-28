@@ -1,15 +1,26 @@
 import React, { useContext } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from '../ui/ThemeToggle';
 import Button from '../ui/Button';
 import NotificationBell from '../ui/NotificationBell';
 import ExtensionButton from '../ui/ExtensionButton';
 import { Plus, Menu } from 'lucide-react';
 import { LayoutContext } from './DashboardLayout';
+import { AuthContext } from '../../context/AuthContext';
 
 const TopBar = ({ title, showTabs = true, onAddClick }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { setIsMobileOpen } = useContext(LayoutContext);
+  const { user } = useContext(AuthContext);
+
+  const handleAddClick = () => {
+    if (!user) {
+      navigate('/account');
+    } else if (onAddClick) {
+      onAddClick();
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 px-6 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
@@ -26,7 +37,7 @@ const TopBar = ({ title, showTabs = true, onAddClick }) => {
           </h1>
         </div>
         <div className="flex items-center gap-4">
-          <Button variant="primary" size="sm" className="gap-2" onClick={onAddClick}>
+          <Button variant="primary" size="sm" className="gap-2" onClick={handleAddClick}>
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add Repository</span>
             <span className="inline sm:hidden">Add</span>

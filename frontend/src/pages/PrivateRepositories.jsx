@@ -9,7 +9,7 @@ import { useRepositories } from '../context/RepositoryContext';
 const PrivateRepositories = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { privateRepos, addPrivateRepo } = useRepositories();
+  const { privateRepos, loadingRepos, addPrivateRepo } = useRepositories();
 
   const filteredRepos = privateRepos.filter(repo => 
     repo.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -42,12 +42,16 @@ const PrivateRepositories = () => {
           ))}
         </RepositoryGrid>
 
-        {filteredRepos.length === 0 && (
+        {loadingRepos ? (
+          <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
+            <h3 className="text-lg font-medium text-slate-500 dark:text-slate-400">Loading repositories...</h3>
+          </div>
+        ) : filteredRepos.length === 0 ? (
           <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
             <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">No repositories found</h3>
             <p className="text-slate-500 mt-2">Try adjusting your search query.</p>
           </div>
-        )}
+        ) : null}
       </div>
       
       <AddRepositoryModal 
