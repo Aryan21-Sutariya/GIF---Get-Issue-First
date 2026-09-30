@@ -135,4 +135,57 @@ router.post('/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+router.delete('/account', async (req, res) => {
+  try {
+    const token = req.cookies.gif_token;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const decoded = jwt.verify(token, SESSION_SECRET);
+    if (!decoded || !decoded.userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // The user record deletion naturally cascades downwards to GitHubAccount,
+    // Repository, RepositoryLabel, Issue, IssueLabel, and Notification via Prisma schema rules.
+    await prisma.user.delete({
+      where: { id: decoded.userId }
+    });
+
+    res.clearCookie('gif_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+
+    res.json({ success: true, message: 'Account and associated data deleted successfully.' });
+  } catch (err) {
+    console.error('Account Deletion Error:', err);
+    res.status(500).json({ error: 'Failed to delete account. Please try again.' });
+  }
+});
+router.delete('/account', async (req, res) => {
+  try {
+    const token = req.cookies.gif_token;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const decoded = jwt.verify(token, SESSION_SECRET);
+    if (!decoded || !decoded.userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // The user record deletion naturally cascades downwards to GitHubAccount,
+    // Repository, RepositoryLabel, Issue, IssueLabel, and Notification via Prisma schema rules.
+    await prisma.user.delete({
+      where: { id: decoded.userId }
+    });
+
+    res.clearCookie('gif_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+
+    res.json({ success: true, message: 'Account and associated data deleted successfully.' });
+  } catch (err) {
+    console.error('Account Deletion Error:', err);
+    res.status(500).json({ error: 'Failed to delete account. Please try again.' });
+  }
+});
+
 module.exports = router;

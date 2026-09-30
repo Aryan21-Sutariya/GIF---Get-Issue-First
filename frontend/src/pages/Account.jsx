@@ -1,12 +1,32 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import TopBar from '../components/layout/TopBar';
-import { LogOut, CheckCircle2, LogIn } from 'lucide-react';
+import { LogOut, CheckCircle2, LogIn, AlertTriangle } from 'lucide-react';
 import Button from '../components/ui/Button';
 import GithubIcon from '../components/ui/GithubIcon';
 import { AuthContext } from '../context/AuthContext';
+import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
+import { api } from '../services/api';
 
 const Account = () => {
   const { user, login, logout, loading } = useContext(AuthContext);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const toast = useToast();
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await api.deleteAccount();
+      // On success, backend cleared cookie, now we clear frontend state
+      await logout(); 
+      // logout function in context already handles window.location.href = '/'
+    } catch (err) {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      toast.error(err.message || 'We could not delete your account. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -84,17 +104,57 @@ const Account = () => {
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 text-red-600 dark:text-red-500">
                   Danger Zone
                 </h3>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-6">
                   <div>
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Log out of GIF</p>
                     <p className="text-sm text-slate-500 mt-1">Clear your session. You won't receive notifications.</p>
                   </div>
-                  <Button onClick={logout} variant="danger" className="gap-2">
+                  <Button onClick={logout} variant="default" className="bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 gap-2 border-transparent">
                     <LogOut className="h-4 w-4" />
                     Logout
                   </Button>
                 </div>
+                
+                <div className="flex items-center justify-between pt-6 border-t border-red-100 dark:border-red-900/30">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Delete Account</p>
+                    <p className="text-sm text-slate-500 mt-1">Permanently remove your GIF data and watchlist.</p>
+                  </div>
+                  <Button onClick={() => setShowDeleteConfirm(true)} variant="danger" className="gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Delete Account
+                  </Button>
+                </div>
               </div>
+
+              <Modal
+                isOpen={showDeleteConfirm}
+                onClose={() => !isDeleting && setShowDeleteConfirm(false)}
+                title="Delete your GIF account?"
+              >
+                <div className="space-y-6">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    This will permanently delete your GIF account, your watchlist, and all of your notification histories.
+                    <strong> Your actual GitHub account and its repositories will NOT be affected.</strong>
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                    This action cannot be undone.
+                  </p>
+                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="default"
+                      className="bg-red-600 hover:bg-red-700 text-white dark:hover:bg-red-700 dark:bg-red-600 border-transparent shadow-none"
+                      onClick={handleDeleteAccount} 
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Deleting...' : 'Delete Account'}
+                    </Button>
+                  </div>
+                </div>
+              </Modal>
             </>
           )}
 

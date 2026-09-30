@@ -45,6 +45,11 @@ export const api = {
     const res = await fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
     return res.json();
   },
+  deleteAccount: async () => {
+    const res = await fetch(`${API_URL}/api/auth/account`, { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to delete account');
+    return res.json();
+  },
   lookupPublicRepository: async (url) => {
     const res = await fetch(`${API_URL}/api/repositories/public/lookup?url=${encodeURIComponent(url)}`, { credentials: 'include' });
     if (!res.ok) {

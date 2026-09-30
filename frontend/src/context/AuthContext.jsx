@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.logout();
       setUser(null);
+      window.location.href = '/';
     } catch (err) {
       console.error('Logout failed', err);
     }
