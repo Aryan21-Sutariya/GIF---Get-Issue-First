@@ -53,12 +53,12 @@ export const api = {
     }
     return res.json();
   },
-  addPublicRepository: async (url, selectedLabels) => {
+  addPublicRepository: async (url, selectedLabels, watchAllIssues = false) => {
     const res = await fetch(`${API_URL}/api/repositories/public`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ url, selectedLabels })
+      body: JSON.stringify({ url, selectedLabels, watchAllIssues })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -71,16 +71,28 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch public repositories');
     return res.json();
   },
-  updatePublicRepositoryLabels: async (repositoryId, labels) => {
+  updatePublicRepositoryLabels: async (repositoryId, labels, watchAllIssues = false) => {
     const res = await fetch(`${API_URL}/api/repositories/public/${repositoryId}/labels`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ labels })
+      body: JSON.stringify({ labels, watchAllIssues })
     });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Failed to update labels');
+    }
+    return res.json();
+  },
+  deletePublicRepository: async (repositoryId) => {
+    const res = await fetch(`${API_URL}/api/repositories/public/${repositoryId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete repository');
     }
     return res.json();
   },
@@ -105,12 +117,12 @@ export const api = {
     }
     return res.json();
   },
-  addPrivateRepository: async (url, selectedLabels) => {
+  addPrivateRepository: async (url, selectedLabels, watchAllIssues = false) => {
     const res = await fetch(`${API_URL}/api/repositories/private`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ url, selectedLabels })
+      body: JSON.stringify({ url, selectedLabels, watchAllIssues })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -123,12 +135,12 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch private repositories');
     return res.json();
   },
-  updatePrivateRepositoryLabels: async (repositoryId, labels) => {
+  updatePrivateRepositoryLabels: async (repositoryId, labels, watchAllIssues = false) => {
     const res = await fetch(`${API_URL}/api/repositories/private/${repositoryId}/labels`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ labels })
+      body: JSON.stringify({ labels, watchAllIssues })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -141,6 +153,18 @@ export const api = {
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Failed to fetch issues');
+    }
+    return res.json();
+  },
+  deletePrivateRepository: async (repositoryId) => {
+    const res = await fetch(`${API_URL}/api/repositories/private/${repositoryId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete repository');
     }
     return res.json();
   }

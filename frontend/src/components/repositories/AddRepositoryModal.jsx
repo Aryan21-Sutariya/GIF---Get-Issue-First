@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { Info, Plus } from 'lucide-react';
+import { Info, Plus, Globe } from 'lucide-react';
 import { api } from '../../services/api';
+import { useToast } from '../ui/Toast';
 
 const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
   const [step, setStep] = useState(1);
@@ -13,6 +14,8 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
   const [error, setError] = useState(null);
   const [repoData, setRepoData] = useState(null);
   const [availableLabels, setAvailableLabels] = useState([]);
+  const [watchAllIssues, setWatchAllIssues] = useState(false);
+  const toast = useToast();
   
   React.useEffect(() => {
     if (isOpen) {
@@ -23,6 +26,7 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
       setError(null);
       setRepoData(null);
       setAvailableLabels([]);
+      setWatchAllIssues(false);
     }
   }, [isOpen]);
 
@@ -35,15 +39,21 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
       if (isPrivate) {
         const data = await api.lookupPrivateRepository(url);
         setRepoData(data);
-        setAvailableLabels(data.labels.length > 0 ? data.labels : ['good first issue', 'help wanted']);
+        setAvailableLabels(data.labels && data.labels.length > 0 ? data.labels : []);
+        if (data.noLabelsAvailable) {
+          setWatchAllIssues(true);
+        }
       } else {
         const data = await api.lookupPublicRepository(url);
         setRepoData(data);
-        setAvailableLabels(data.labels.length > 0 ? data.labels : ['good first issue', 'help wanted']);
+        setAvailableLabels(data.labels && data.labels.length > 0 ? data.labels : []);
+        if (data.noLabelsAvailable) {
+          setWatchAllIssues(true);
+        }
       }
       setStep(2);
     } catch (err) {
-      setError(err.message || 'Failed to lookup repository.');
+      setError("We couldn't find that repository. Check the GitHub URL and make sure it is accessible from your account.");
     } finally {
       setLoading(false);
     }
@@ -69,22 +79,17 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
     setLoading(true);
     setError(null);
     try {
-      if (isPrivate) {
-         await onAdd(url, selectedLabels);
-         alert(`Repository added to your watchlist.`);
-         onClose();
-         return;
-      }
-      
-      await onAdd(url, selectedLabels);
-      alert(`Repository added to your watchlist.`);
+      await onAdd(url, watchAllIssues ? [] : selectedLabels, watchAllIssues);
+      toast.success('Repository added to your watchlist.');
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to save repository.');
+      setError("We couldn't save this repository. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  const canStartWatching = watchAllIssues || selectedLabels.length > 0;
 
   return (
     <Modal 
@@ -144,10 +149,63 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
              )}
           </div>
 
-          <div>
-            <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
-              Choose which issue labels you want to be notified about.
-            </h4>
+          {/* All Issues Toggle */}
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex items-center gap-3">
+                <Globe className="h-5 w-5 text-purple-500" />
+                <div>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100">All Issues</span>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {watchAllIssues 
+                      ? 'GIF will notify you about every new issue in this repository.' 
+                      : 'Monitor all new issues regardless of labels.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={watchAllIssues}
+                onClick={() => setWatchAllIssues(!watchAllIssues)}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+                  watchAllIssues ? 'bg-purple-600' : 'bg-slate-300 dark:bg-slate-600'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform ring-0 transition duration-200 ease-in-out ${
+                    watchAllIssues ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </label>
+          </div>
+
+          {/* Label selection - disabled when All Issues is ON */}
+          <div className={watchAllIssues ? 'opacity-40 pointer-events-none' : ''}>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                Choose which issue labels you want to be notified about.
+              </h4>
+              {!watchAllIssues && availableLabels.length > 0 && (
+                <div className="flex gap-3 text-xs">
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedLabels(availableLabels)} 
+                    className="text-purple-600 hover:text-purple-700 font-medium dark:text-purple-400 dark:hover:text-purple-300"
+                  >
+                    Select All
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedLabels([])} 
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+            </div>
             
             <div className="flex flex-wrap gap-2 mb-4">
               {availableLabels.map(label => {
@@ -156,6 +214,7 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
                   <button
                     key={label}
                     onClick={() => toggleLabel(label)}
+                    disabled={watchAllIssues}
                     className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
                       isSelected 
                         ? 'border-purple-200 bg-purple-100 text-purple-800 dark:border-purple-800 dark:bg-purple-900/40 dark:text-purple-300' 
@@ -166,10 +225,13 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
                   </button>
                 )
               })}
+              {availableLabels.length === 0 && !watchAllIssues && (
+                <p className="text-xs text-slate-400 italic">No labels found for this repository. You can use "All Issues" or add custom labels.</p>
+              )}
             </div>
           </div>
 
-          <div className="pt-2">
+          <div className={`pt-2 ${watchAllIssues ? 'opacity-40 pointer-events-none' : ''}`}>
             <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
               Custom label input
             </label>
@@ -180,8 +242,9 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
                 placeholder="e.g. priority/high"
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
+                disabled={watchAllIssues}
               />
-              <Button type="submit" variant="default" size="sm" className="gap-1 px-3">
+              <Button type="submit" variant="default" size="sm" className="gap-1 px-3" disabled={watchAllIssues}>
                 <Plus className="h-4 w-4" />
                 Add
               </Button>
@@ -191,7 +254,7 @@ const AddRepositoryModal = ({ isOpen, onClose, isPrivate, onAdd }) => {
 
           <div className="mt-8 pt-4 flex justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
             <Button variant="ghost" onClick={() => setStep(1)} disabled={loading}>Back</Button>
-            <Button variant="primary" onClick={handleStartWatching} disabled={loading || selectedLabels.length === 0}>
+            <Button variant="primary" onClick={handleStartWatching} disabled={loading || !canStartWatching}>
               {loading ? 'Saving...' : 'Start Watching'}
             </Button>
           </div>

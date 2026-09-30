@@ -67,19 +67,22 @@ router.post('/github', async (req, res) => {
             continue;
           }
 
+          const isWatchAll = gifRepo.watchAllIssues === true;
           const watchedLabels = gifRepo.repositoryLabels.map(rl => rl.labelName.toLowerCase());
-          const isMatch = issueLabels.some(l => watchedLabels.includes(l.toLowerCase()));
 
-          if (!isMatch) {
-            console.log(`[Webhook] Issue did not match watched labels for repository ${gifRepo.fullName} - ignoring event`);
-            continue;
+          if (!isWatchAll) {
+            const isMatch = issueLabels.some(l => watchedLabels.includes(l.toLowerCase()));
+            if (!isMatch) {
+              console.log(`[Webhook] Issue did not match watched labels for repository ${gifRepo.fullName} - ignoring event`);
+              continue;
+            }
           }
 
-          const matchedLabel = issueLabels.find(l => watchedLabels.includes(l.toLowerCase()));
+          const matchedLabel = isWatchAll ? '(all issues)' : issueLabels.find(l => watchedLabels.includes(l.toLowerCase()));
           console.log(`[Webhook] Issue matched`);
           console.log(`Repository: ${repository.full_name}`);
           console.log(`Issue: #${issue.number}`);
-          console.log(`Matched label: ${matchedLabel}`);
+          console.log(`Matched: ${matchedLabel}`);
 
           const upsertedIssue = await prisma.issue.upsert({
             where: {

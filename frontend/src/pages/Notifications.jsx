@@ -1,9 +1,22 @@
 import React, { useContext } from 'react';
+import { X } from 'lucide-react';
 import TopBar from '../components/layout/TopBar';
 import { LayoutContext } from '../components/layout/DashboardLayout';
+import { useToast } from '../components/ui/Toast';
 
 const Notifications = () => {
-  const { notifications, loadingNotifications: loading, handleMarkNotificationAsRead: handleMarkAsRead } = useContext(LayoutContext);
+  const { notifications, loadingNotifications: loading, handleMarkNotificationAsRead: handleMarkAsRead, handleDismissNotification } = useContext(LayoutContext);
+  const toast = useToast();
+
+  const handleDismiss = async (e, id) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await handleDismissNotification(id);
+    } catch (err) {
+      toast.error("Couldn't dismiss notification. Please try again.");
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -22,7 +35,7 @@ const Notifications = () => {
                 key={n.id} 
                 className={`p-4 border rounded-lg flex flex-col md:flex-row md:items-center justify-between ${n.isRead ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-blue-50 dark:bg-slate-800/80 border-blue-200 dark:border-blue-500/30'}`}
               >
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
                     {n.repository?.fullName || 'Unknown Repository'}
                   </p>
@@ -33,14 +46,23 @@ const Notifications = () => {
                     {new Date(n.createdAt).toLocaleString()}
                   </p>
                 </div>
-                {!n.isRead && (
-                  <button 
-                    onClick={() => handleMarkAsRead(n.id)}
-                    className="mt-4 md:mt-0 text-sm px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shrink-0"
+                <div className="flex items-center gap-2 mt-4 md:mt-0 shrink-0">
+                  {!n.isRead && (
+                    <button 
+                      onClick={() => handleMarkAsRead(n.id)}
+                      className="text-sm px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    >
+                      Mark as Read
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => handleDismiss(e, n.id)}
+                    aria-label="Dismiss notification"
+                    className="p-2 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-800"
                   >
-                    Mark as Read
+                    <X className="h-4 w-4" />
                   </button>
-                )}
+                </div>
               </div>
             ))}
           </div>

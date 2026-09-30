@@ -39,6 +39,7 @@ model Repository {
   fullName          String
   url               String
   isPrivate         Boolean           @default(false)
+  watchAllIssues    Boolean           @default(false)
   monitoringEnabled Boolean           @default(true)
   lastSyncedAt      DateTime?
   createdAt         DateTime          @default(now())

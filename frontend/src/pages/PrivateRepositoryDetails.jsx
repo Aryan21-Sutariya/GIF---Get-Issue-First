@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, ExternalLink, Star, Lock } from 'lucide-react';
+import { ArrowLeft, MessageSquare, ExternalLink, Star, Lock, Globe } from 'lucide-react';
 import TopBar from '../components/layout/TopBar';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import GithubIcon from '../components/ui/GithubIcon';
 import { useRepositories } from '../context/RepositoryContext';
 import { api } from '../services/api';
+import { useToast } from '../components/ui/Toast';
+import Modal from '../components/ui/Modal';
 
 const PRESET_LABELS = [
   'bug', 'documentation', 'enhancement', 'beginner', 
@@ -17,9 +19,14 @@ const PrivateRepositoryDetail = () => {
   const { owner, repo } = useParams();
   const repoName = `${owner}/${repo}`;
   const location = useLocation();
+  const navigate = require('react-router-dom').useNavigate();
   const [activeTab, setActiveTab] = useState('issues');
-  const { privateRepos, updatePrivateRepoLabels } = useRepositories();
+  const { privateRepos, updatePrivateRepoLabels, deletePrivateRepo } = useRepositories();
   const [customLabel, setCustomLabel] = useState('');
+  const toast = useToast();
+  
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [issues, setIssues] = useState([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
@@ -31,16 +38,19 @@ const PrivateRepositoryDetail = () => {
     description: 'A repository not found natively in contexts.',
     language: 'Unknown',
     stars: '~',
-    labels: []
+    labels: [],
+    watchAllIssues: false
   };
 
   const [localLabels, setLocalLabels] = useState(repository.labels || []);
+  const [localWatchAll, setLocalWatchAll] = useState(repository.watchAllIssues || false);
 
   React.useEffect(() => {
     if (repository.labels) {
       setLocalLabels(repository.labels);
     }
-  }, [repository.labels]);
+    setLocalWatchAll(repository.watchAllIssues || false);
+  }, [repository.labels, repository.watchAllIssues]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -48,7 +58,7 @@ const PrivateRepositoryDetail = () => {
     let interval;
 
     if (activeTab === 'issues' && repository && repository.id) {
-       if (repository.labels.length === 0) {
+       if (!localWatchAll && repository.labels.length === 0) {
          if (isMounted) {
            setIssues([]);
            setIssuesError(null);
@@ -68,7 +78,7 @@ const PrivateRepositoryDetail = () => {
            const data = await api.fetchPrivateGithubIssuesAction(repository.id);
            if (isMounted) setIssues(data.issues || []);
          } catch (err) {
-           if (isMounted && !silent) setIssuesError(err.message);
+           if (isMounted && !silent) setIssuesError("Couldn't load issues right now. Please try again.");
          } finally {
            if (isMounted) {
              if (!silent) setLoadingIssues(false);
@@ -87,7 +97,7 @@ const PrivateRepositoryDetail = () => {
       isMounted = false; 
       if (interval) clearInterval(interval);
     };
-  }, [activeTab, repository.id, repository.labels]);
+  }, [activeTab, repository.id, repository.labels, localWatchAll]);
 
   React.useEffect(() => {
     if (activeTab === 'issues' && issues.length > 0) {
@@ -128,13 +138,35 @@ const PrivateRepositoryDetail = () => {
     if (!repository || !repository.id) return;
     setIsSavingSettings(true);
     try {
-      await api.updatePrivateRepositoryLabels(repository.id, localLabels);
-      updatePrivateRepoLabels(repoName, localLabels);
-      alert('Settings successfully updated and persisted to Database!');
+      await api.updatePrivateRepositoryLabels(repository.id, localWatchAll ? [] : localLabels, localWatchAll);
+      updatePrivateRepoLabels(repoName, localWatchAll ? [] : localLabels, localWatchAll);
+      toast.success('Monitoring settings saved successfully.');
     } catch (err) {
-      alert('Failed to save settings: ' + err.message);
+      toast.error("We couldn't save your monitoring settings. Please try again.");
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  const handleSelectAllLabels = () => {
+    const allLabels = Array.from(new Set([...localLabels, ...PRESET_LABELS]));
+    setLocalLabels(allLabels);
+  };
+  
+  const handleClearAllLabels = () => {
+    setLocalLabels([]);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deletePrivateRepo(repository.id);
+      toast.success('Repository removed from your GIF watchlist.');
+      navigate('/private');
+    } catch(err) {
+      toast.error("We couldn't remove this repository. Please try again.");
+      setIsDeleting(false);
+      setShowConfirmDelete(false);
     }
   };
 
@@ -173,6 +205,12 @@ const PrivateRepositoryDetail = () => {
                     <Lock className="h-3 w-3" />
                     Private
                   </span>
+                  {repository.watchAllIssues && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 dark:border-purple-800/50 dark:bg-purple-900/20 dark:text-purple-300">
+                      <Globe className="h-3 w-3" />
+                      All Issues
+                    </span>
+                  )}
                 </div>
                 <p className="text-slate-600 dark:text-slate-400 max-w-2xl mb-4">
                   {repository.description}
@@ -190,17 +228,27 @@ const PrivateRepositoryDetail = () => {
               </div>
             </div>
             
-            <a 
-              href={`https://github.com/${repository.name}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="shrink-0"
-            >
-              <Button variant="default" className="gap-2 w-full sm:w-auto">
-                Open on GitHub
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </a>
+            <div className="shrink-0 flex flex-col sm:flex-row gap-2 w-full sm:w-auto z-10 relative">
+              <a 
+                href={`https://github.com/${repository.name}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Button variant="default" className="gap-2 w-full sm:w-auto text-sm">
+                  Open on GitHub
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </a>
+              {activeTab === 'settings' && (
+                <Button 
+                  variant="ghost" 
+                  className="w-full sm:w-auto text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
+                  onClick={() => setShowConfirmDelete(true)}
+                >
+                  Remove Repository
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -235,18 +283,18 @@ const PrivateRepositoryDetail = () => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                New Matching Issues
+                {localWatchAll ? 'All Issues' : 'New Matching Issues'}
               </h2>
             </div>
             
             <div className="space-y-4">
               {loadingIssues ? (
                 <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
-                  <p className="text-slate-500 dark:text-slate-400">Loading matching private issues...</p>
+                  <p className="text-slate-500 dark:text-slate-400">Loading {localWatchAll ? 'all' : 'matching'} private issues...</p>
                 </div>
               ) : issuesError ? (
                 <div className="text-center py-12 px-4 border border-red-300 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 rounded-lg">
-                  <p className="text-red-500 dark:text-red-400 font-medium">Error: {issuesError}</p>
+                  <p className="text-red-500 dark:text-red-400 font-medium">{issuesError}</p>
                 </div>
               ) : issues.length > 0 ? (
                 issues.map((issue) => (
@@ -290,11 +338,11 @@ const PrivateRepositoryDetail = () => {
                     </div>
                   </div>
                 ))
-              ) : repository.labels.length === 0 ? (
+              ) : !localWatchAll && repository.labels.length === 0 ? (
                 <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
                    <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">No labels selected</h3>
                    <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md mx-auto">
-                    Please select at least one label in Repository Settings to start watching matching issues.
+                    Please select at least one label in Repository Settings, or enable All Issues mode.
                   </p>
                   <Button variant="primary" onClick={() => setActiveTab('settings')}>
                     Go to Settings
@@ -303,7 +351,7 @@ const PrivateRepositoryDetail = () => {
               ) : (
                 <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
                   <p className="text-slate-500 dark:text-slate-400">
-                    No new matching issues found for <span className="font-medium text-slate-700 dark:text-slate-300">{repoName}</span>.
+                    No new {localWatchAll ? '' : 'matching '}issues found for <span className="font-medium text-slate-700 dark:text-slate-300">{repoName}</span>.
                   </p>
                 </div>
               )}
@@ -317,7 +365,43 @@ const PrivateRepositoryDetail = () => {
               Repository Settings
             </h2>
             
-            <div className="mt-8 mb-6">
+            {/* Monitoring Mode */}
+            <div className="mt-6 mb-6">
+              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-3">
+                Monitoring Mode
+              </h3>
+              <div className="space-y-3">
+                <label className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${!localWatchAll ? 'border-purple-300 bg-purple-50/50 dark:border-purple-700 dark:bg-purple-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                  <input 
+                    type="radio" 
+                    name="monitoringMode" 
+                    checked={!localWatchAll} 
+                    onChange={() => setLocalWatchAll(false)}
+                    className="mt-1 accent-purple-600"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Selected labels</span>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Only issues matching your selected labels will be monitored.</p>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${localWatchAll ? 'border-purple-300 bg-purple-50/50 dark:border-purple-700 dark:bg-purple-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                  <input 
+                    type="radio" 
+                    name="monitoringMode" 
+                    checked={localWatchAll} 
+                    onChange={() => setLocalWatchAll(true)}
+                    className="mt-1 accent-purple-600"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">All issues</span>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Every new issue in this repository will be monitored.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Label Configuration */}
+            <div className={`mt-8 mb-6 ${localWatchAll ? 'opacity-40 pointer-events-none' : ''}`}>
               <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
                 Issue notification labels
               </h3>
@@ -326,9 +410,17 @@ const PrivateRepositoryDetail = () => {
               </p>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Current labels:
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Current labels:
+                  </label>
+                  {!localWatchAll && (
+                    <div className="flex gap-3 text-xs">
+                      <button type="button" onClick={handleSelectAllLabels} className="text-purple-600 hover:text-purple-700 font-medium dark:text-purple-400 dark:hover:text-purple-300">Select All</button>
+                      <button type="button" onClick={handleClearAllLabels} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">Clear All</button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {localLabels.length === 0 ? (
                     <span className="text-sm text-slate-400 italic">No labels selected</span>
@@ -397,6 +489,33 @@ const PrivateRepositoryDetail = () => {
         )}
 
       </div>
+      
+      <Modal
+        isOpen={showConfirmDelete}
+        onClose={() => setShowConfirmDelete(false)}
+        title="Remove repository from GIF?"
+      >
+        <div className="space-y-6">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            This will stop GIF from monitoring this repository and remove it from your watchlist. 
+            <strong> Your GitHub repository will not be deleted.</strong>
+          </p>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="ghost" onClick={() => setShowConfirmDelete(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button 
+              variant="default"
+              className="bg-red-600 hover:bg-red-700 text-white dark:hover:bg-red-700 dark:bg-red-600 border-transparent shadow-none"
+              onClick={confirmDelete} 
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Removing...' : 'Remove Repository'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 };

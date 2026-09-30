@@ -33,24 +33,36 @@ export const RepositoryProvider = ({ children }) => {
     return () => { isMounted = false; };
   }, [user]);
 
-  const addPublicRepo = async (url, selectedLabels) => {
-    await api.addPublicRepository(url, selectedLabels);
+  const addPublicRepo = async (url, selectedLabels, watchAllIssues = false) => {
+    await api.addPublicRepository(url, selectedLabels, watchAllIssues);
     const updated = await api.getPublicRepositories();
     setPublicRepos(updated);
   };
 
-  const addPrivateRepo = async (url, selectedLabels) => {
-    await api.addPrivateRepository(url, selectedLabels);
+  const addPrivateRepo = async (url, selectedLabels, watchAllIssues = false) => {
+    await api.addPrivateRepository(url, selectedLabels, watchAllIssues);
     const updated = await api.getPrivateRepositories();
     setPrivateRepos(updated);
   };
 
-  const updatePublicRepoLabels = (name, labels) => {
-    setPublicRepos(prev => prev.map(r => r.name === name ? { ...r, labels } : r));
+  const updatePublicRepoLabels = (name, labels, watchAllIssues) => {
+    setPublicRepos(prev => prev.map(r => r.name === name ? { ...r, labels, ...(watchAllIssues !== undefined ? { watchAllIssues } : {}) } : r));
   };
 
-  const updatePrivateRepoLabels = (name, labels) => {
-    setPrivateRepos(prev => prev.map(r => r.name === name ? { ...r, labels } : r));
+  const deletePublicRepo = async (id) => {
+    await api.deletePublicRepository(id);
+    const updated = await api.getPublicRepositories();
+    setPublicRepos(updated);
+  };
+
+  const updatePrivateRepoLabels = (name, labels, watchAllIssues) => {
+    setPrivateRepos(prev => prev.map(r => r.name === name ? { ...r, labels, ...(watchAllIssues !== undefined ? { watchAllIssues } : {}) } : r));
+  };
+
+  const deletePrivateRepo = async (id) => {
+    await api.deletePrivateRepository(id);
+    const updated = await api.getPrivateRepositories();
+    setPrivateRepos(updated);
   };
 
   return (
@@ -61,7 +73,9 @@ export const RepositoryProvider = ({ children }) => {
       addPublicRepo,
       addPrivateRepo,
       updatePublicRepoLabels,
-      updatePrivateRepoLabels
+      updatePrivateRepoLabels,
+      deletePublicRepo,
+      deletePrivateRepo
     }}>
       {children}
     </RepositoryContext.Provider>

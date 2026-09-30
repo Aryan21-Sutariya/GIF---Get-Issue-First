@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowRight, Bell, Search, Lock, Puzzle, Zap, Globe, GitPullRequest, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Bell, Search, Lock, Zap, Globe, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import GithubIcon from '../components/ui/GithubIcon';
 import ThemeToggle from '../components/ui/ThemeToggle';
@@ -72,7 +72,7 @@ const Landing = () => {
         </section>
 
         {/* Section 2: How GIF Works */}
-        <section className="px-6 py-20 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
+        <section className="px-6 py-16 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">How it works</h2>
@@ -118,7 +118,7 @@ const Landing = () => {
         </section>
 
         {/* Section 3: Notification Flow */}
-        <section className="px-6 py-24 bg-slate-50 dark:bg-slate-950">
+        <section className="px-6 py-16 bg-slate-50 dark:bg-slate-950">
           <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-12">
             <div className="flex-1 space-y-6">
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Workflow Intelligence</h2>
@@ -178,7 +178,7 @@ const Landing = () => {
         </section>
 
         {/* Section 4: Key Features */}
-        <section className="px-6 py-24 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
+        <section className="px-6 py-16 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">Core Capabilities</h2>
@@ -194,7 +194,7 @@ const Landing = () => {
                 { icon: Search, title: 'Label Tracking', desc: 'Filter noise uniquely by selecting precise label strings.' },
                 { icon: Zap, title: 'Real-time Detection', desc: 'Webhooks verify events synchronously delivering updates reliably.' },
                 { icon: Bell, title: 'In-app Notifications', desc: 'Unified dashboard streams matching events natively.' },
-                { icon: Puzzle, title: 'Browser Extension', desc: 'Cross-origin polling pushes counts dynamically.' },
+                { icon: Globe, title: 'All Issues Mode', desc: 'Monitor every new issue in a repository without label filtering.' },
               ].map((feature, idx) => (
                 <div key={idx} className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:border-purple-300 dark:hover:border-purple-800 transition-colors">
                   <feature.icon className="h-6 w-6 text-purple-600 dark:text-purple-500 mb-4" />
@@ -206,24 +206,8 @@ const Landing = () => {
           </div>
         </section>
 
-        {/* Section 5: Extension focus */}
-        <section className="px-6 py-24 bg-purple-50 dark:bg-purple-950/20 text-center border-b border-slate-200 dark:border-slate-800">
-           <div className="max-w-3xl mx-auto">
-             <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 flex items-center justify-center mx-auto mb-6 shadow-sm">
-                <Puzzle className="h-8 w-8 text-purple-600 dark:text-purple-500" />
-             </div>
-             <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">Extend your reach</h2>
-             <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-xl mx-auto">
-                Keep GIF notifications close with the GIF browser extension. View unseen matching issues natively from your toolbar.
-             </p>
-             <button disabled className="px-6 py-3 rounded-lg bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm cursor-not-allowed font-medium text-sm">
-               Chrome Web Store link coming soon
-             </button>
-           </div>
-        </section>
-
-        {/* Section 6: Final CTA */}
-        <section className="px-6 py-24 md:py-32 text-center bg-slate-900 dark:bg-slate-950">
+        {/* Section 5: Final CTA */}
+        <section className="px-6 py-20 md:py-28 text-center bg-slate-900 dark:bg-slate-950">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
               Start finding issues before they get crowded.

@@ -55,7 +55,16 @@ router.get('/public/lookup', async (req, res) => {
     }
     
     if (labels.length === 0) {
-       return res.status(400).json({ error: 'Repository has no labels available.' });
+       return res.json({
+         githubRepoId: repoData.id,
+         owner: repoData.owner.login,
+         name: repoData.name,
+         fullName: repoData.full_name,
+         url: repoData.html_url,
+         description: repoData.description || '',
+         labels: [],
+         noLabelsAvailable: true
+       });
     }
 
     return res.json({
@@ -76,8 +85,9 @@ router.get('/public/lookup', async (req, res) => {
 
 router.post('/public', async (req, res) => {
   try {
-    const { url, selectedLabels } = req.body;
-    if (!url || !selectedLabels || !Array.isArray(selectedLabels)) {
+    const { url, selectedLabels, watchAllIssues } = req.body;
+    const isWatchAll = watchAllIssues === true;
+    if (!url || (!isWatchAll && (!selectedLabels || !Array.isArray(selectedLabels)))) {
       return res.status(400).json({ error: 'URL and selectedLabels are required.' });
     }
 
@@ -113,20 +123,26 @@ router.post('/public', async (req, res) => {
       return res.status(400).json({ error: 'Repository is already added to your watchlist.' });
     }
 
+    const repoCreateData = {
+      userId: req.user.id,
+      githubRepoId: repoData.id,
+      owner: repoData.owner.login,
+      name: repoData.name,
+      fullName: repoData.full_name,
+      url: repoData.html_url,
+      isPrivate: false,
+      monitoringEnabled: true,
+      watchAllIssues: isWatchAll
+    };
+
+    if (!isWatchAll && selectedLabels && selectedLabels.length > 0) {
+      repoCreateData.repositoryLabels = {
+        create: selectedLabels.map(label => ({ labelName: label }))
+      };
+    }
+
     const createdRepo = await prisma.repository.create({
-      data: {
-        userId: req.user.id,
-        githubRepoId: repoData.id,
-        owner: repoData.owner.login,
-        name: repoData.name,
-        fullName: repoData.full_name,
-        url: repoData.html_url,
-        isPrivate: false,
-        monitoringEnabled: true,
-        repositoryLabels: {
-          create: selectedLabels.map(label => ({ labelName: label }))
-        }
-      },
+      data: repoCreateData,
       include: {
         repositoryLabels: true
       }
@@ -156,7 +172,8 @@ router.get('/public', async (req, res) => {
       watchedIssues: 0,
       newIssues: 0,
       labels: r.repositoryLabels.map(l => l.labelName),
-      isPrivate: r.isPrivate
+      isPrivate: r.isPrivate,
+      watchAllIssues: r.watchAllIssues
     }));
 
     return res.json(formatted);
@@ -169,17 +186,25 @@ router.get('/public', async (req, res) => {
 router.put('/public/:repositoryId/labels', async (req, res) => {
   try {
     const { repositoryId } = req.params;
-    const { labels } = req.body;
-    
-    if (!Array.isArray(labels)) return res.status(400).json({ error: 'Labels must be an array' });
+    const { labels, watchAllIssues } = req.body;
+    const isWatchAll = watchAllIssues === true;
 
     const repo = await prisma.repository.findUnique({ where: { id: repositoryId } });
     if (!repo) return res.status(404).json({ error: 'Repository not found' });
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized to modify this repository' });
 
-    await prisma.repositoryLabel.deleteMany({
-      where: { repositoryId }
-    });
+    if (isWatchAll) {
+      // Switch to All Issues mode: clear labels, set flag
+      await prisma.repositoryLabel.deleteMany({ where: { repositoryId } });
+      await prisma.repository.update({ where: { id: repositoryId }, data: { watchAllIssues: true } });
+      return res.json({ labels: [], watchAllIssues: true });
+    }
+
+    // Switch to label mode
+    if (!Array.isArray(labels)) return res.status(400).json({ error: 'Labels must be an array' });
+
+    await prisma.repository.update({ where: { id: repositoryId }, data: { watchAllIssues: false } });
+    await prisma.repositoryLabel.deleteMany({ where: { repositoryId } });
 
     if (labels.length > 0) {
       await prisma.repositoryLabel.createMany({
@@ -188,7 +213,7 @@ router.put('/public/:repositoryId/labels', async (req, res) => {
     }
 
     const updatedLabels = await prisma.repositoryLabel.findMany({ where: { repositoryId } });
-    return res.json({ labels: updatedLabels.map(l => l.labelName) });
+    return res.json({ labels: updatedLabels.map(l => l.labelName), watchAllIssues: false });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error updating labels' });
@@ -213,8 +238,10 @@ router.get('/public/:repositoryId/issues', async (req, res) => {
       return res.status(400).json({ error: 'This is a private repository flow.' });
     }
 
+    const isWatchAll = repo.watchAllIssues === true;
     const watchedLabels = repo.repositoryLabels.map(rl => rl.labelName.toLowerCase());
-    if (watchedLabels.length === 0) {
+
+    if (!isWatchAll && watchedLabels.length === 0) {
       return res.status(400).json({ error: 'No watched labels configured. Please configure labels in settings.' });
     }
 
@@ -239,10 +266,23 @@ router.get('/public/:repositoryId/issues', async (req, res) => {
       if (issue.pull_request) continue;
       
       const issueLabels = issue.labels.map(l => l.name);
-      
-      const isMatch = issueLabels.some(l => watchedLabels.includes(l.toLowerCase()));
-      if (isMatch) {
-         matchedIssues.push({
+
+      if (isWatchAll) {
+        // All Issues mode: accept every non-PR issue
+        matchedIssues.push({
+          githubIssueId: issue.id,
+          issueNumber: issue.number,
+          title: issue.title,
+          url: issue.html_url,
+          author: issue.user.login,
+          githubCreatedAt: new Date(issue.created_at),
+          labels: issueLabels,
+          commentCount: issue.comments || 0
+        });
+      } else {
+        const isMatch = issueLabels.some(l => watchedLabels.includes(l.toLowerCase()));
+        if (isMatch) {
+          matchedIssues.push({
             githubIssueId: issue.id,
             issueNumber: issue.number,
             title: issue.title,
@@ -251,7 +291,8 @@ router.get('/public/:repositoryId/issues', async (req, res) => {
             githubCreatedAt: new Date(issue.created_at),
             labels: issueLabels,
             commentCount: issue.comments || 0
-         });
+          });
+        }
       }
     }
 
@@ -354,7 +395,16 @@ router.get('/private/lookup', async (req, res) => {
     }
     
     if (labels.length === 0) {
-       return res.status(400).json({ error: 'Repository has no labels available.' });
+       return res.json({
+         githubRepoId: repoData.id,
+         owner: repoData.owner.login,
+         name: repoData.name,
+         fullName: repoData.full_name,
+         url: repoData.html_url,
+         description: repoData.description || '',
+         labels: [],
+         noLabelsAvailable: true
+       });
     }
 
     return res.json({
@@ -373,10 +423,31 @@ router.get('/private/lookup', async (req, res) => {
   }
 });
 
+router.delete('/public/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const repo = await prisma.repository.findUnique({ where: { id: repositoryId } });
+    
+    if (!repo) return res.status(404).json({ error: 'Repository not found.' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized to delete this repository.' });
+    if (repo.isPrivate) return res.status(400).json({ error: 'This is a private repository flow.' });
+
+    // Since onDelete: Cascade is configured on RepositoryLabel, Notification, and Issue, 
+    // simply deleting the Repository will correctly clean up all associated data.
+    await prisma.repository.delete({ where: { id: repositoryId } });
+
+    return res.json({ success: true, message: 'Repository removed successfully.' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error deleting repository.' });
+  }
+});
+
 router.post('/private', async (req, res) => {
   try {
-    const { url, selectedLabels } = req.body;
-    if (!url || !selectedLabels || !Array.isArray(selectedLabels)) {
+    const { url, selectedLabels, watchAllIssues } = req.body;
+    const isWatchAll = watchAllIssues === true;
+    if (!url || (!isWatchAll && (!selectedLabels || !Array.isArray(selectedLabels)))) {
       return res.status(400).json({ error: 'URL and selectedLabels are required.' });
     }
 
@@ -412,20 +483,26 @@ router.post('/private', async (req, res) => {
       return res.status(400).json({ error: 'Repository is already added to your watchlist.' });
     }
 
+    const repoCreateData = {
+      userId: req.user.id,
+      githubRepoId: repoData.id,
+      owner: repoData.owner.login,
+      name: repoData.name,
+      fullName: repoData.full_name,
+      url: repoData.html_url,
+      isPrivate: true,
+      monitoringEnabled: true,
+      watchAllIssues: isWatchAll
+    };
+
+    if (!isWatchAll && selectedLabels && selectedLabels.length > 0) {
+      repoCreateData.repositoryLabels = {
+        create: selectedLabels.map(label => ({ labelName: label }))
+      };
+    }
+
     const createdRepo = await prisma.repository.create({
-      data: {
-        userId: req.user.id,
-        githubRepoId: repoData.id,
-        owner: repoData.owner.login,
-        name: repoData.name,
-        fullName: repoData.full_name,
-        url: repoData.html_url,
-        isPrivate: true,
-        monitoringEnabled: true,
-        repositoryLabels: {
-          create: selectedLabels.map(label => ({ labelName: label }))
-        }
-      },
+      data: repoCreateData,
       include: {
         repositoryLabels: true
       }
@@ -455,7 +532,8 @@ router.get('/private', async (req, res) => {
       watchedIssues: 0,
       newIssues: 0,
       labels: r.repositoryLabels.map(l => l.labelName),
-      isPrivate: true
+      isPrivate: true,
+      watchAllIssues: r.watchAllIssues
     }));
 
     return res.json(formatted);
@@ -468,18 +546,24 @@ router.get('/private', async (req, res) => {
 router.put('/private/:repositoryId/labels', async (req, res) => {
   try {
     const { repositoryId } = req.params;
-    const { labels } = req.body;
-    
-    if (!Array.isArray(labels)) return res.status(400).json({ error: 'Labels must be an array' });
+    const { labels, watchAllIssues } = req.body;
+    const isWatchAll = watchAllIssues === true;
 
     const repo = await prisma.repository.findUnique({ where: { id: repositoryId } });
     if (!repo) return res.status(404).json({ error: 'Repository not found' });
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized to modify this repository' });
     if (!repo.isPrivate) return res.status(400).json({ error: 'This is a public repository endpoint' });
 
-    await prisma.repositoryLabel.deleteMany({
-      where: { repositoryId }
-    });
+    if (isWatchAll) {
+      await prisma.repositoryLabel.deleteMany({ where: { repositoryId } });
+      await prisma.repository.update({ where: { id: repositoryId }, data: { watchAllIssues: true } });
+      return res.json({ labels: [], watchAllIssues: true });
+    }
+
+    if (!Array.isArray(labels)) return res.status(400).json({ error: 'Labels must be an array' });
+
+    await prisma.repository.update({ where: { id: repositoryId }, data: { watchAllIssues: false } });
+    await prisma.repositoryLabel.deleteMany({ where: { repositoryId } });
 
     if (labels.length > 0) {
       await prisma.repositoryLabel.createMany({
@@ -488,7 +572,7 @@ router.put('/private/:repositoryId/labels', async (req, res) => {
     }
 
     const updatedLabels = await prisma.repositoryLabel.findMany({ where: { repositoryId } });
-    return res.json({ labels: updatedLabels.map(l => l.labelName) });
+    return res.json({ labels: updatedLabels.map(l => l.labelName), watchAllIssues: false });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error updating labels' });
@@ -507,8 +591,12 @@ router.get('/private/:repositoryId/issues', async (req, res) => {
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized to view this repository' });
     if (!repo.isPrivate) return res.status(400).json({ error: 'This is a private repository flow.' });
 
+    const isWatchAll = repo.watchAllIssues === true;
     const watchedLabels = repo.repositoryLabels.map(rl => rl.labelName.toLowerCase());
-    if (watchedLabels.length === 0) return res.status(400).json({ error: 'No watched labels configured.' });
+
+    if (!isWatchAll && watchedLabels.length === 0) {
+      return res.status(400).json({ error: 'No watched labels configured.' });
+    }
 
     const fetchOpts = {
       headers: {
@@ -527,10 +615,22 @@ router.get('/private/:repositoryId/issues', async (req, res) => {
     for (const issue of ghIssues) {
       if (issue.pull_request) continue;
       const issueLabels = issue.labels.map(l => l.name);
-      const isMatch = issueLabels.some(l => watchedLabels.includes(l.toLowerCase()));
-      
-      if (isMatch) {
-         matchedIssues.push({
+
+      if (isWatchAll) {
+        matchedIssues.push({
+          githubIssueId: issue.id,
+          issueNumber: issue.number,
+          title: issue.title,
+          url: issue.html_url,
+          author: issue.user.login,
+          githubCreatedAt: new Date(issue.created_at),
+          labels: issueLabels,
+          commentCount: issue.comments || 0
+        });
+      } else {
+        const isMatch = issueLabels.some(l => watchedLabels.includes(l.toLowerCase()));
+        if (isMatch) {
+          matchedIssues.push({
             githubIssueId: issue.id,
             issueNumber: issue.number,
             title: issue.title,
@@ -539,7 +639,8 @@ router.get('/private/:repositoryId/issues', async (req, res) => {
             githubCreatedAt: new Date(issue.created_at),
             labels: issueLabels,
             commentCount: issue.comments || 0
-         });
+          });
+        }
       }
     }
 
@@ -590,6 +691,24 @@ router.get('/private/:repositoryId/issues', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal Server Error while fetching issues' });
+  }
+});
+
+router.delete('/private/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const repo = await prisma.repository.findUnique({ where: { id: repositoryId } });
+    
+    if (!repo) return res.status(404).json({ error: 'Repository not found.' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized to delete this repository.' });
+    if (!repo.isPrivate) return res.status(400).json({ error: 'This is a public repository flow.' });
+
+    await prisma.repository.delete({ where: { id: repositoryId } });
+
+    return res.json({ success: true, message: 'Repository removed successfully.' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error deleting repository.' });
   }
 });
 
