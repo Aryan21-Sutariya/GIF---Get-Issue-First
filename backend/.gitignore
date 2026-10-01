@@ -1,3 +1,9 @@
 node_modules
 .env
 dist
+
+# Local Testing and Internal Development Artifacts
+test_api.js
+test_webhook_receiver.js
+test_public_polling.js
+scripts/smee.js
