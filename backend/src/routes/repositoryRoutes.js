@@ -298,6 +298,15 @@ router.get('/public/:repositoryId/issues', async (req, res) => {
 
     const dbIssues = [];
     for (const match of matchedIssues) {
+       const existingIssue = await prisma.issue.findUnique({
+         where: {
+           repositoryId_githubIssueId: {
+             repositoryId: repo.id,
+             githubIssueId: BigInt(match.githubIssueId)
+           }
+         }
+       });
+
        const upsertedIssue = await prisma.issue.upsert({
          where: {
            repositoryId_githubIssueId: {
@@ -332,6 +341,29 @@ router.get('/public/:repositoryId/issues', async (req, res) => {
              labelName
            }))
          });
+       }
+
+       if (!existingIssue && match.githubCreatedAt > repo.createdAt) {
+         try {
+           await prisma.notification.upsert({
+             where: {
+               userId_repositoryId_issueId: {
+                 userId: repo.userId,
+                 repositoryId: repo.id,
+                 issueId: upsertedIssue.id
+               }
+             },
+             update: {},
+             create: {
+               userId: repo.userId,
+               repositoryId: repo.id,
+               issueId: upsertedIssue.id,
+               type: "NEW_MATCHING_ISSUE"
+             }
+           });
+         } catch (notifErr) {
+           console.error("Error creating polling notification:", notifErr);
+         }
        }
 
        dbIssues.push({
